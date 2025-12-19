@@ -1,0 +1,56 @@
+# --- 1. Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-office-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smart-office-backend
+  template:
+    metadata:
+      labels:
+        app: smart-office-backend
+    spec:
+      containers:
+      - name: smart-office-backend
+        image: smart-office:v1  # صورة تطبيقك التي بنيتها
+        imagePullPolicy: Never  # مهم جداً: يخبره باستخدام الصورة المحلية وعدم البحث في الإنترنت
+        ports:
+        - containerPort: 5000
+        env:
+        # هنا نربط Secret بمتغير البيئة في الكود
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: smart-office-secret
+              key: mongo-uri
+        # هنا نربط ConfigMap
+        - name: FLASK_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: smart-office-config
+              key: FLASK_ENV
+        # إضافة Health Check كما يطلب التحدي
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+
+---
+# --- 2. Service (للوصول للتطبيق من المتصفح) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smart-office-service
+spec:
+  type: LoadBalancer  # أو NodePort حسب البيئة
+  selector:
+    app: smart-office-backend
+  ports:
+    - protocol: TCP
+      port: 5000       # المنفذ الخارجي
+      targetPort: 5000 # منفذ الحاوية
