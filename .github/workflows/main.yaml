@@ -27,7 +27,8 @@ jobs:
     - name: Run Tests
       run: |
         cd final_project_withDB
-        # إنشاء ملف اختبار مؤقت إذا لم يكن موجوداً لتجنب فشل الـ Pipeline
+        # هذا السطر هو الحل: نجعل المجلد الحالي مرئياً لبايثون
+        export PYTHONPATH=$PYTHONPATH:.
         echo "def test_dummy(): assert True" > test_dummy.py
         pytest
 
