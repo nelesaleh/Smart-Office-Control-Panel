@@ -5,34 +5,38 @@ from flask_pymongo import PyMongo
 from flask_cors import CORS
 from prometheus_flask_exporter import PrometheusMetrics
 
-# --- 1. تعريف الأدوات خارج الدالة (Global) لتجنب التكرار ---
+# 1. تعريف الأدوات خارج الدالة (Global) لتجنب أخطاء التكرار في الاختبارات
 mongo = PyMongo()
-metrics = PrometheusMetrics(app=None) # نهيئها فارغة أولاً
+metrics = PrometheusMetrics(app=None) # نهيئها فارغة
 
-# تعريف المقياس مرة واحدة فقط هنا في الخارج
+# تعريف المقياس مرة واحدة فقط هنا
 stock_gauge = metrics.info('stock_value', 'Simulated Stock Value')
 
 def create_app():
-    app = Flask(__name__, instance_relative_config=True, template_folder='../templates')
+    """Application factory function."""
+    app = Flask(
+        __name__,
+        instance_relative_config=True,
+        template_folder='../templates'
+    )
 
-    # إعدادات التطبيق
+    # 2. الإعدادات
     app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb://localhost:27017/smart_office")
     app.config["SECRET_KEY"] = "dev"
 
-    # --- 2. تهيئة الأدوات وربطها بالتطبيق ---
+    # 3. ربط الأدوات بالتطبيق
     mongo.init_app(app)
     CORS(app)
-    metrics.init_app(app) # ربط المراقبة بالتطبيق الآن
+    metrics.init_app(app) # تفعيل المراقبة هنا
 
-    # --- 3. نقاط النهاية (Routes) ---
-    
+    # 4. نقطة النهاية الجديدة للأسهم (Stock Route)
     @app.route('/api/stock')
     def get_stock():
         val = random.randint(50, 150)
-        # نستخدم المتغير العام المعرف بالأعلى
-        stock_gauge.set(val)
+        stock_gauge.set(val) # تحديث القيمة في Prometheus
         return jsonify({"current_stock": val})
 
+    # 5. نقطة فحص الصحة
     @app.route('/health')
     def health_check():
         try:
@@ -41,7 +45,7 @@ def create_app():
         except Exception as e:
             return jsonify(status="unhealthy", error=str(e)), 500
 
-    # تسجيل المخططات (Blueprints)
+    # تسجيل المخططات
     from .blueprints.main import main_bp
     from .blueprints.control import control_bp
     from .blueprints.energy import energy_bp
