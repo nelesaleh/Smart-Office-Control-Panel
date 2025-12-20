@@ -5,29 +5,33 @@ from flask_pymongo import PyMongo
 from flask_cors import CORS
 from prometheus_flask_exporter import PrometheusMetrics
 
+# --- 1. تعريف الأدوات خارج الدالة (Global) لتجنب التكرار ---
 mongo = PyMongo()
+metrics = PrometheusMetrics(app=None) # نهيئها فارغة أولاً
+
+# تعريف المقياس مرة واحدة فقط هنا في الخارج
+stock_gauge = metrics.info('stock_value', 'Simulated Stock Value')
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True, template_folder='../templates')
 
-    # الإعدادات
+    # إعدادات التطبيق
     app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb://localhost:27017/smart_office")
     app.config["SECRET_KEY"] = "dev"
 
-    # تهيئة المكتبات
+    # --- 2. تهيئة الأدوات وربطها بالتطبيق ---
     mongo.init_app(app)
     CORS(app)
-    metrics = PrometheusMetrics(app)
+    metrics.init_app(app) # ربط المراقبة بالتطبيق الآن
 
-    # --- هذا هو الجزء المفقود غالباً ---
-    stock_gauge = metrics.info('stock_value', 'Simulated Stock Value')
-
+    # --- 3. نقاط النهاية (Routes) ---
+    
     @app.route('/api/stock')
     def get_stock():
         val = random.randint(50, 150)
+        # نستخدم المتغير العام المعرف بالأعلى
         stock_gauge.set(val)
         return jsonify({"current_stock": val})
-    # ----------------------------------
 
     @app.route('/health')
     def health_check():
